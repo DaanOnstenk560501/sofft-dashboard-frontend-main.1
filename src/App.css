@@ -1,0 +1,1011 @@
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+.app-container {
+  display: flex;
+  height: 100vh;
+  width: 100vw;
+  background-color: #f3f4f6;
+  overflow: hidden;
+}
+
+.sidebar {
+  width: 250px;
+  background-color: #ffffff;
+  border-right: 1px solid #e5e7eb;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  flex-shrink: 0;
+}
+
+.sidebar-logo {
+  width: 180px;  
+  display: block;
+  margin: 0 auto 5px auto;
+}
+
+.sidebar h1 {
+  font-size: 1.25rem;
+  font-weight: bold;
+  margin-bottom: 10px;
+}
+
+.sidebar nav {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.sidebar button {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border: none;
+  background: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.95rem;
+  transition: background 0.2s, color 0.2s;
+  color: #000000;
+}
+
+.sidebar button:hover {
+  background-color: #f3f4f6;
+}
+
+.sidebar button.active {
+  background-color: #1DA15E;
+  color: white;
+}
+
+.sidebar button svg {
+  color: inherit;
+}
+
+.main-content {
+  flex: 1;
+  padding: 24px;
+  overflow-y: auto;
+  background-color: #f3f4f6;
+}
+
+.overview-container {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.overview-filter-card {
+  background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 20px 24px;
+  box-shadow: 0 8px 18px rgba(15, 118, 110, 0.08);
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.overview-filter-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.overview-filter-header h2 {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.overview-filter-header p {
+  margin: 4px 0 0 0;
+  color: #475569;
+  font-size: 0.9rem;
+}
+
+.overview-filter-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: #dcfce7;
+  color: #15803d;
+  display: grid;
+  place-items: center;
+}
+
+.overview-filters {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.overview-filter-label {
+  color: #0f172a;
+  font-weight: 600;
+  font-size: 0.95rem;
+}
+
+.time-range-chip-group {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.time-range-chip {
+  border: 1px solid #e2e8f0;
+  color: #1f2937;
+  background: #ffffff;
+  padding: 6px 14px;
+  border-radius: 999px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 4px rgba(15, 23, 42, 0.05);
+}
+
+.time-range-chip:hover {
+  border-color: #10b981;
+  box-shadow: 0 4px 10px rgba(16, 185, 129, 0.15);
+}
+
+.time-range-chip.active {
+  background: linear-gradient(135deg, #34d399 0%, #10b981 100%);
+  border-color: transparent;
+  color: #ffffff;
+  box-shadow: 0 6px 14px rgba(16, 185, 129, 0.35);
+}
+
+.current-range-caption {
+  color: #4b5563;
+  font-size: 0.9rem;
+}
+
+.current-range-caption strong {
+  color: #0f172a;
+}
+
+.time-dropdown {
+  margin-left: 8px;
+  padding: 6px 12px;
+  border-radius: 6px;
+  border: 1px solid #d1d5db;
+  background-color: white;
+  color: #111827;
+  cursor: pointer;
+}
+
+.overview-grid-top {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 20px;
+}
+
+.overview-bottom-layout {
+  display: flex;
+  gap: 20px;
+  align-items: flex-start;
+}
+
+.overview-grid-bottom {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 20px;
+  flex: 1;
+}
+
+.overview-line-chart {
+  width: 100%;
+  height: 320px;
+  background-color: #ffffff;
+  border-radius: 10px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+  padding: 16px 20px 20px 28px;
+  overflow: visible;
+}
+
+.overview-card {
+  background-color: #ffffff;
+  padding: 20px;
+  border-radius: 10px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.overview-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
+
+.card-icon {
+  color: #1DA15E;
+}
+
+.card-value {
+  font-size: 1.25rem;
+  font-weight: bold;
+  margin: 0;
+  color: #111827;
+}
+
+.card-title {
+  font-size: 0.85rem;
+  color: #6b7280;
+  margin: 0;
+}
+
+.overview-right-column {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  width: 250px;
+}
+
+.top-sellers,
+.top-countries {
+  background-color: #ffffff;
+  padding: 20px;
+  border-radius: 10px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+}
+
+.top-sellers h3,
+.top-countries h3 {
+  margin-bottom: 12px;
+  font-size: 1rem;
+  font-weight: bold;
+  color: #111827;
+}
+
+.top-sellers ol,
+.top-countries ol {
+  padding-left: 20px;
+  list-style-type: decimal;
+  color: #374151;
+}
+
+.top-sellers li,
+.top-countries li {
+  margin-bottom: 6px;
+  font-size: 0.95rem;
+}
+
+.geo-page {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.geo-header {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 24px;
+}
+
+.geo-title {
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: #111827;
+}
+
+.geo-subtitle {
+  margin-top: 6px;
+  max-width: 560px;
+  color: #4b5563;
+  line-height: 1.5;
+}
+
+.geo-summary {
+  display: flex;
+  gap: 16px;
+  align-items: stretch;
+}
+
+.geo-summary-card {
+  background-color: #ffffff;
+  padding: 16px 20px;
+  border-radius: 10px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.08);
+  min-width: 160px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.geo-summary-label {
+  font-size: 0.85rem;
+  color: #6b7280;
+}
+
+.geo-summary-value {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #111827;
+}
+
+.geo-warning {
+  background-color: #fef3c7;
+  border: 1px solid #fcd34d;
+  color: #92400e;
+  border-radius: 8px;
+  padding: 12px 16px;
+  font-size: 0.95rem;
+}
+
+.geo-content {
+  display: flex;
+  gap: 24px;
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+
+.geo-map-card {
+  flex: 1 1 600px;
+  min-width: 480px;
+  background-color: #ffffff;
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  position: relative;
+}
+
+.geo-map-container {
+  width: 100%;
+  height: 480px;
+}
+
+.geo-map-container svg {
+  width: 100%;
+  height: 100%;
+}
+
+.geo-legend {
+  margin-top: 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 0.85rem;
+  color: #4b5563;
+}
+
+.geo-legend-gradient {
+  flex: 1;
+  height: 12px;
+  border-radius: 999px;
+  background: linear-gradient(
+    90deg,
+    #d7f2df 0%,
+    #aee4c5 20%,
+    #7acc9d 40%,
+    #49a374 60%,
+    #2f7b51 80%,
+    #18553a 100%
+  );
+}
+
+.geo-hover-card {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  background-color: rgba(17, 24, 39, 0.85);
+  color: #ffffff;
+  padding: 14px 18px;
+  border-radius: 8px;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  pointer-events: none;
+}
+
+.geo-hover-title {
+  font-size: 0.9rem;
+  font-weight: 600;
+}
+
+.geo-hover-value {
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+
+.geo-hover-subtext {
+  font-size: 0.85rem;
+  color: rgba(255, 255, 255, 0.85);
+}
+
+.geo-side-panel {
+  flex: 0 0 280px;
+  background-color: #ffffff;
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.geo-side-panel h3 {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #111827;
+}
+
+.geo-side-panel ol {
+  list-style: decimal;
+  padding-left: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  color: #374151;
+}
+
+.geo-side-panel li div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.geo-country-name {
+  font-weight: 600;
+}
+
+.geo-country-sales {
+  font-family: "Inter", "Segoe UI", sans-serif;
+  color: #1d4ed8;
+  font-weight: 600;
+}
+
+.geo-side-note {
+  font-size: 0.85rem;
+  color: #6b7280;
+  line-height: 1.4;
+}
+
+@media (max-width: 1024px) {
+  .geo-map-card {
+    flex: 1 1 100%;
+    min-width: unset;
+  }
+
+  .geo-map-container {
+    height: 360px;
+  }
+
+  .geo-summary {
+    width: 100%;
+    justify-content: flex-start;
+    flex-wrap: wrap;
+  }
+}
+
+/* ================================
+   OFFERS PAGE STYLES
+================================ */
+
+.offers-container {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.offers-title {
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: #111827;
+}
+
+/* ---------- FILTER BAR (Salesman + Date Range) ---------- */
+
+.filter-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end; /* ✅ aligns inputs evenly */
+  gap: 20px;
+  background-color: #ffffff;
+  padding: 12px 16px;
+  border-radius: 10px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+  width: 100%;
+}
+
+.filter-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 160px;
+}
+
+.filter-group label {
+  font-size: 0.85rem;
+  color: #111827;
+  font-weight: 500;
+}
+
+/* Salesman dropdown */
+.salesman-dropdown.small {
+  padding: 8px 10px;
+  font-size: 0.9rem;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  background-color: #ffffff;
+  color: #111827;
+  cursor: pointer;
+  transition: border-color 0.2s ease;
+  height: 36px; /* ✅ ensures consistent height with date inputs */
+}
+
+.salesman-dropdown.small:hover,
+.salesman-dropdown.small:focus {
+  border-color: #1da15e;
+  outline: none;
+}
+
+/* ---------- DATE RANGE FILTER (Reusable Component) ---------- */
+
+.date-range-filter {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.date-range-filter .filter-label {
+  font-size: 0.85rem;
+  color: #111827;
+  font-weight: 500;
+}
+
+.date-range-inputs {
+  display: flex;
+  align-items: flex-end; /* ✅ matches dropdown alignment */
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.date-input-wrapper {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.date-input-wrapper label {
+  font-size: 0.75rem;
+  color: #4b5563;
+}
+
+.date-range-filter input[type="date"] {
+  padding: 8px 10px;
+  font-size: 0.9rem;
+  border: 1px solid #d1d5db;
+  border-radius: 6px;
+  background-color: #ffffff;
+  color: #111827;
+  cursor: pointer;
+  transition: border-color 0.2s ease;
+  appearance: auto;
+  -webkit-appearance: auto;
+  position: relative;
+  z-index: 5;
+  height: 36px; /* ✅ same height as dropdown */
+}
+
+.date-range-filter input[type="date"]:hover,
+.date-range-filter input[type="date"]:focus {
+  border-color: #1da15e;
+  outline: none;
+}
+
+/* ---------- KPI GRID ---------- */
+
+.overview-grid-top {
+  margin-bottom: 10px;
+}
+
+.kpi-three {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 20px;
+}
+
+/* KPI Card */
+.overview-card {
+  background-color: #ffffff;
+  padding: 20px;
+  border-radius: 10px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+  display: flex;
+  align-items: center;
+  gap: 15px;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.overview-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.card-icon {
+  color: #1da15e;
+  flex-shrink: 0;
+}
+
+.card-value {
+  font-size: 1.25rem;
+  font-weight: bold;
+  margin: 0;
+  color: #111827;
+}
+
+.card-title {
+  font-size: 0.85rem;
+  color: #6b7280;
+  margin: 0;
+}
+
+/* ---------- SALESMAN DETAILS ---------- */
+
+.salesman-details {
+  background-color: #ffffff;
+  padding: 20px;
+  border-radius: 10px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+}
+
+.salesman-details h3 {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: #111827;
+  margin-bottom: 12px;
+}
+
+.salesman-chart-card {
+  margin-top: 12px;
+}
+
+.salesman-chart-card h4 {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #1f2937;
+  margin-bottom: 10px;
+}
+
+/* ---------- CHART CARDS ---------- */
+
+.offers-chart-section {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+}
+
+.offers-chart-card {
+  background-color: #ffffff;
+  flex: 1;
+  min-width: 320px;
+  padding: 20px;
+  border-radius: 10px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+}
+
+.offers-chart-card h3 {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #111827;
+  margin-bottom: 10px;
+}
+
+/* ---------- STATUS PIE CHART ---------- */
+
+.offers-status-card {
+  background-color: #ffffff;
+  padding: 20px;
+  border-radius: 10px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+}
+
+.offers-status-card h3 {
+  font-size: 1.2rem;
+  font-weight: 600;
+  color: #111827;
+  margin-bottom: 12px;
+}
+
+.offers-pie-container {
+  width: 100%;
+  height: 300px;
+}
+
+/* ---------- FIX FOR RECHARTS DARK OVERLAY ---------- */
+
+.chart-wrapper {
+  position: relative;
+  width: 100%;
+  height: 320px;
+  background-color: #ffffff;
+  border-radius: 10px;
+  overflow: visible;
+}
+
+.chart-wrapper::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-color: #ffffff;
+  z-index: 0;
+}
+
+.recharts-wrapper,
+.recharts-surface {
+  position: relative;
+  z-index: 1;
+  background-color: #ffffff !important;
+}
+
+.recharts-wrapper[style*="width: 0"],
+.recharts-wrapper[style*="height: 0"] {
+  display: none !important;
+}
+
+/* ---------- OFFER STATUS LEGEND ---------- */
+
+.status-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px 20px;
+  margin-top: 16px;
+  justify-content: center;
+  align-items: center;
+  min-height: 24px;
+}
+
+.status-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.9rem;
+  color: #374151;
+  background-color: #f9fafb;
+  padding: 4px 8px;
+  border-radius: 6px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+.status-color {
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  display: inline-block;
+}
+
+.status-empty {
+  font-size: 0.9rem;
+  color: #6b7280;
+}
+
+/* ---------- RESPONSIVE ---------- */
+
+@media (max-width: 1024px) {
+  .offers-chart-section {
+    flex-direction: column;
+  }
+
+  .kpi-three {
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  }
+
+  .filter-bar {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+}
+
+@media (max-width: 768px) {
+  .salesman-details h3 {
+    font-size: 1.1rem;
+  }
+
+  .date-range-inputs {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 6px;
+  }
+}
+/* ============================
+   PRODUCT INSIGHTS PAGE
+============================ */
+
+.product-insights-container {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  padding: 24px;
+  background-color: #f3f4f6;
+  min-height: 100vh;
+}
+
+.product-insights-title {
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: #111827;
+}
+
+/* KPI GRID */
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 20px;
+}
+
+.kpi-card {
+  background-color: #ffffff;
+  border-radius: 10px;
+  padding: 20px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.kpi-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.kpi-card h3 {
+  font-size: 0.9rem;
+  color: #6b7280;
+  margin-bottom: 6px;
+}
+
+.kpi-value {
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: #1da15e;
+}
+
+/* CHARTS */
+.chart-section {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 20px;
+}
+
+.charts-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 20px;
+}
+
+.chart-card {
+  flex: 1;
+  min-width: 300px;
+  background-color: #ffffff;
+  border-radius: 10px;
+  padding: 18px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+}
+
+.chart-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.chart-card h3 {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #111827;
+  margin: 0;
+}
+
+/* FILTER DROPDOWN */
+.category-filter {
+  padding: 6px 10px;
+  border-radius: 6px;
+  border: 1px solid #d1d5db;
+  background-color: #ffffff;
+  color: #111827; /* ✅ Makes text dark and readable */
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.category-filter:hover,
+.category-filter:focus {
+  border-color: #1da15e;
+  box-shadow: 0 0 0 3px rgba(29, 161, 94, 0.15);
+  outline: none;
+}
+
+/* RECHARTS CONTAINER */
+.chart-wrapper {
+  width: 100%;
+  height: 280px;
+}
+
+/* TOP ITEMS LIST */
+.top-items-list {
+  list-style: decimal;
+  padding-left: 20px;
+  color: #374151;
+  line-height: 1.6;
+}
+
+.top-items-list li {
+  margin-bottom: 6px;
+  font-size: 0.95rem;
+}
+
+/* DISCOUNTED UPSELLS */
+.discounted-upsells-card {
+  background-color: #ffffff;
+  border-radius: 10px;
+  padding: 20px;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+}
+
+.discounted-upsells-card h3 {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #111827;
+  margin-bottom: 10px;
+}
+
+.discounted-info {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 0.95rem;
+  color: #374151;
+}
+
+/* LOADING STATE */
+.product-insights-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 80vh;
+  color: #4b5563;
+}
+
+.loader {
+  border: 4px solid #f3f4f6;
+  border-top: 4px solid #1da15e;
+  border-radius: 50%;
+  width: 40px;
+  height: 40px;
+  animation: spin 1s linear infinite;
+  margin-bottom: 10px;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* RESPONSIVE */
+@media (max-width: 768px) {
+  .chart-section {
+    flex-direction: column;
+  }
+}
+
+
+
+
+
