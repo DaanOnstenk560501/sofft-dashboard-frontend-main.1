@@ -22,4 +22,4 @@ jobs:
 
       - name: Trigger CodeBuild
         run: |
-          aws codebuild start-build --project-name sofft-frontend-build
+          aws codebuild start-build --project-name frontend-build
