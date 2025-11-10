@@ -1,0 +1,216 @@
+# AWS CodeBuild specification for Frontend Deployment
+# Builds and deploys the React/Vite frontend to existing ECS infrastructure
+
+version: 0.2
+
+env:
+  variables:
+    NODE_VERSION: "20"
+    AWS_DEFAULT_REGION: "eu-central-1"
+    IMAGE_REPO_NAME: "sofft-dashboard-frontend"
+    CONTAINER_NAME: "frontend-container"
+    ECS_CLUSTER: "sofft-cluster"  # Update with your actual cluster name
+    ECS_SERVICE: "sofft-frontend-service"  # Update with your actual service name
+
+phases:
+  pre_build:
+    commands:
+      - echo "Starting build at `date`"
+      - echo "AWS Account ID - $AWS_ACCOUNT_ID"
+      
+      # Login to ECR
+      - echo "Logging in to Amazon ECR..."
+      - aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com
+      
+      # Set image URI
+      - REPOSITORY_URI=$AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$IMAGE_REPO_NAME
+      - COMMIT_HASH=$(echo $CODEBUILD_RESOLVED_SOURCE_VERSION | cut -c 1-7)
+      - IMAGE_TAG=${COMMIT_HASH:=latest}
+      - echo "Image URI - $REPOSITORY_URI:$IMAGE_TAG"
+      
+      # Install dependencies
+      - echo "Installing Node.js dependencies..."
+      - npm ci --prefer-offline --no-audit
+      
+      # Run linting
+      - echo "Running ESLint..."
+      - npm run lint
+      
+      # Build the Vite application
+      - echo "Building production application..."
+      - npm run build
+      
+      # Verify build output
+      - echo "Build output:"
+      - ls -la dist/
+
+  build:
+    commands:
+      - echo "Building Docker image..."
+      
+      # Create Dockerfile if it doesn't exist
+      - |
+        if [ ! -f Dockerfile ]; then
+          echo "Creating Dockerfile..."
+          cat > Dockerfile <<'EOF'
+        # Multi-stage build for optimized production image
+        FROM node:20-alpine as builder
+        WORKDIR /app
+        COPY package*.json ./
+        RUN npm ci --only=production
+        COPY . .
+        RUN npm run build
+        
+        # Production stage with nginx
+        FROM nginx:alpine
+        
+        # Copy custom nginx config if exists, otherwise use default
+        COPY --from=builder /app/nginx.conf /etc/nginx/conf.d/default.conf 2>/dev/null || \
+        echo 'server {
+            listen 80;
+            server_name localhost;
+            root /usr/share/nginx/html;
+            index index.html;
+            
+            # Gzip
+            gzip on;
+            gzip_vary on;
+            gzip_min_length 1024;
+            gzip_types text/plain text/css text/xml text/javascript application/javascript application/xml+rss application/json;
+            
+            # Cache static assets
+            location ~* \.(js|css|png|jpg|jpeg|gif|svg|ico|woff|woff2)$ {
+                expires 1y;
+                add_header Cache-Control "public, immutable";
+            }
+            
+            # React Router support
+            location / {
+                try_files $uri $uri/ /index.html;
+            }
+            
+            # Health check endpoint
+            location /health {
+                access_log off;
+                return 200 "healthy\n";
+                add_header Content-Type text/plain;
+            }
+        }' > /etc/nginx/conf.d/default.conf
+        
+        # Copy built application
+        COPY --from=builder /app/dist /usr/share/nginx/html
+        
+        # Add health check
+        HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+          CMD wget --no-verbose --tries=1 --spider http://localhost/health || exit 1
+        
+        EXPOSE 80
+        CMD ["nginx", "-g", "daemon off;"]
+        EOF
+        fi
+      
+      # Build and tag Docker image
+      - docker build -t $REPOSITORY_URI:latest .
+      - docker tag $REPOSITORY_URI:latest $REPOSITORY_URI:$IMAGE_TAG
+      
+      # Show image size
+      - docker images $REPOSITORY_URI --format "table {{.Repository}}:{{.Tag}}\t{{.Size}}"
+
+  post_build:
+    commands:
+      - echo "Pushing Docker image to ECR..."
+      
+      # Push both latest and commit-tagged versions
+      - docker push $REPOSITORY_URI:latest
+      - docker push $REPOSITORY_URI:$IMAGE_TAG
+      
+      - echo "✅ Image pushed successfully!"
+      
+      # Get current task definition
+      - echo "Fetching current task definition..."
+      - >
+        TASK_DEFINITION=$(aws ecs describe-task-definition 
+          --task-definition sofft-frontend-task 
+          --query 'taskDefinition' 
+          --output json)
+      
+      # Update task definition with new image
+      - echo "Creating new task definition revision..."
+      - |
+        echo $TASK_DEFINITION | jq --arg IMAGE "$REPOSITORY_URI:$IMAGE_TAG" \
+          '.containerDefinitions[0].image = $IMAGE | 
+           del(.taskDefinitionArn) | 
+           del(.revision) | 
+           del(.status) | 
+           del(.requiresAttributes) | 
+           del(.compatibilities) | 
+           del(.registeredAt) | 
+           del(.registeredBy)' > new-task-definition.json
+      
+      # Register new task definition
+      - >
+        NEW_TASK_INFO=$(aws ecs register-task-definition 
+          --cli-input-json file://new-task-definition.json)
+      
+      - NEW_TASK_DEF=$(echo $NEW_TASK_INFO | jq -r '.taskDefinition.taskDefinitionArn')
+      - echo "New task definition - $NEW_TASK_DEF"
+      
+      # Update ECS service
+      - echo "Updating ECS service..."
+      - >
+        aws ecs update-service 
+          --cluster $ECS_CLUSTER 
+          --service $ECS_SERVICE 
+          --task-definition $NEW_TASK_DEF 
+          --force-new-deployment
+      
+      # Wait for service to stabilize (with timeout)
+      - |
+        echo "Waiting for service to stabilize (max 10 minutes)..."
+        timeout 600 aws ecs wait services-stable \
+          --cluster $ECS_CLUSTER \
+          --services $ECS_SERVICE || echo "Service is still updating..."
+      
+      # Get service status
+      - >
+        aws ecs describe-services 
+          --cluster $ECS_CLUSTER 
+          --services $ECS_SERVICE 
+          --query 'services[0].deployments' 
+          --output table
+      
+      # Get Load Balancer URL (if available)
+      - |
+        echo "Getting application URL..."
+        TARGET_GROUP_ARN=$(aws ecs describe-services \
+          --cluster $ECS_CLUSTER \
+          --services $ECS_SERVICE \
+          --query 'services[0].loadBalancers[0].targetGroupArn' \
+          --output text 2>/dev/null)
+        
+        if [ ! -z "$TARGET_GROUP_ARN" ] && [ "$TARGET_GROUP_ARN" != "None" ]; then
+          ALB_ARN=$(aws elbv2 describe-target-groups \
+            --target-group-arns $TARGET_GROUP_ARN \
+            --query 'TargetGroups[0].LoadBalancerArns[0]' \
+            --output text)
+          
+          ALB_DNS=$(aws elbv2 describe-load-balancers \
+            --load-balancer-arns $ALB_ARN \
+            --query 'LoadBalancers[0].DNSName' \
+            --output text)
+          
+          echo "✅ Application URL: http://$ALB_DNS"
+        fi
+      
+      - echo "🚀 Deployment completed successfully at `date`"
+
+artifacts:
+  files:
+    - new-task-definition.json
+    - '**/*'
+  name: frontend-build-$CODEBUILD_BUILD_NUMBER
+
+cache:
+  paths:
+    - 'node_modules/**/*'
+    - '/root/.npm/**/*'
