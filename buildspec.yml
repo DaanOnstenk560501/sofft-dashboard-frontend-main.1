@@ -10,9 +10,9 @@ env:
     AWS_DEFAULT_REGION: "eu-central-1"
     IMAGE_REPO_NAME: "sofft-dashboard-frontend"
     CONTAINER_NAME: "frontend-container"
-    ECS_CLUSTER: "sofft-cluster"
+    ECS_CLUSTER: "frontend-service"
     ECS_SERVICE: "sofft-frontend-service"
-    TASK_DEFINITION_NAME: "sofft-frontend-task"
+    TASK_DEFINITION_NAME: "frontend-task"
 
 phases:
   install:
