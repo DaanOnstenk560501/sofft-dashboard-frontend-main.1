@@ -8,11 +8,11 @@ env:
     NODE_VERSION: "20"
     AWS_ACCOUNT_ID: "426333731043"
     AWS_DEFAULT_REGION: "eu-central-1"
-    IMAGE_REPO_NAME: "ecr-repo"            # Ensure this ECR repo exists
-    CONTAINER_NAME: "frontend-container"    # Must match the container name in the ECS task definition
+    IMAGE_REPO_NAME: "ecr-repo"            
+    CONTAINER_NAME: "frontend"    # Must match the container name in the ECS task definition
     ECS_CLUSTER: "app-cluster"
     ECS_SERVICE: "frontend-service"
-    TASK_DEFINITION_NAME: "frontend-task"   # ECS task definition family name
+    TASK_DEFINITION_NAME: "frontend-task"
 
 phases:
   install:
