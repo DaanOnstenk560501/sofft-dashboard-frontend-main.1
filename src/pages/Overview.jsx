@@ -1,12 +1,23 @@
 import { useState, useEffect } from "react";
 import * as Icons from "lucide-react";
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+} from "recharts";
 import { RANGE_OPTIONS, resolveDateRange, formatDate } from "../utils/dateRanges";
+import { getDashboardData, getAllDashboardData } from "../apis/dashboard";
 
 export default function Overview() {
   const [selectedRange, setSelectedRange] = useState("6m");
   const [dashboardData, setDashboardData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
   const [currentRange, setCurrentRange] = useState({ start: "", end: "" });
   const EURO_SYMBOL = "\u20AC";
 
@@ -16,41 +27,49 @@ export default function Overview() {
     return numeric.toLocaleString("de-DE");
   };
 
-  // Fetch dashboard KPIs from backend
   useEffect(() => {
-    const fetchDashboardData = async () => {
+    const fetchDashboard = async () => {
       setLoading(true);
+      setError(null);
+
+      // --- Resolve the selected date range ---
       const { start, end } = resolveDateRange(selectedRange, "6m");
       const startDateParam = formatDate(start);
       const endDateParam = formatDate(end);
-
       setCurrentRange({ start: startDateParam, end: endDateParam });
 
       try {
-        const query = new URLSearchParams({
+        // --- Try fetching filtered data first ---
+        let data = await getDashboardData({
           startDate: startDateParam,
           endDate: endDateParam,
         });
-        const response = await fetch(`http://localhost:8080/api/dashboard?${query.toString()}`);
-        if (!response.ok) {
-          throw new Error(`Request failed with status ${response.status}`);
+
+        // --- Fallback if no filtered data returned ---
+        if (!data || Object.keys(data).length === 0) {
+          console.warn("Filtered data empty — fetching all dashboard data instead.");
+          data = await getAllDashboardData();
         }
-        const data = await response.json();
+
         setDashboardData(data);
       } catch (err) {
         console.error("Failed to fetch dashboard data:", err);
+        setError(err.message || "Unknown error occurred.");
         setDashboardData(null);
       } finally {
         setLoading(false);
       }
     };
 
-    fetchDashboardData();
+    fetchDashboard();
   }, [selectedRange]);
 
+  // --- Conditional rendering for different UI states ---
   if (loading) return <p>Loading KPIs...</p>;
+  if (error) return <p style={{ color: "red" }}>Error: {error}</p>;
   if (!dashboardData) return <p>No KPI data found.</p>;
 
+  // --- Extract and format key stats ---
   const stats = [
     { title: "Total Offers Created", value: formatNumber(dashboardData.totalOffers), icon: Icons.FileText },
     { title: "Total Orders", value: formatNumber(dashboardData.totalOrders), icon: Icons.ShoppingCart },
@@ -59,17 +78,18 @@ export default function Overview() {
     { title: "Revenue (Booked Orders)", value: `${EURO_SYMBOL}${formatNumber(dashboardData.revenue)}`, icon: Icons.DollarSign },
     { title: "Average Lead Time", value: `${formatNumber(dashboardData.avgLeadTimeDays)} days`, icon: Icons.Clock },
   ];
-  const topSalesmen = (dashboardData.topSalesmen || []).map((s) => s.salesmanName);
-  const topCountries = (dashboardData.topCountries || []).map((c) => c.countryCode);
-  const salesData = (dashboardData.salesData || []).map((point) => ({
+
+  // --- Top lists and chart data ---
+  const topSalesmen = (dashboardData.topSalesmen ?? []).map((s) => s.salesmanName);
+  const topCountries = (dashboardData.topCountries ?? []).map((c) => c.countryCode);
+  const salesData = (dashboardData.salesData ?? []).map((point) => ({
     date: point.date,
     revenue: Number(point.revenue ?? 0),
   }));
-  const revenueChartMargin = { top: 20, right: 30, bottom: 0, left: 48 };
-  const formatChartValue = (value) => formatNumber(value);
 
   return (
     <div className="overview-container">
+      {/* --- FILTER CARD --- */}
       <section className="overview-filter-card">
         <div className="overview-filter-header">
           <div className="overview-filter-icon">
@@ -103,8 +123,9 @@ export default function Overview() {
         </p>
       </section>
 
+      {/* --- KPI CARDS --- */}
       <div className="overview-grid overview-grid-top">
-        {stats.slice(0, 4).map(({ title, value, icon: Icon }) => (
+        {stats.map(({ title, value, icon: Icon }) => (
           <div key={title} className="overview-card">
             <div className="card-icon"><Icon size={28} /></div>
             <div className="card-content">
@@ -115,56 +136,44 @@ export default function Overview() {
         ))}
       </div>
 
-      <div className="overview-bottom-layout" style={{ marginTop: "20px", gap: "20px" }}>
-        <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: "20px" }}>
-          <div className="overview-grid overview-grid-bottom">
-            {stats.slice(4).map(({ title, value, icon: Icon }) => (
-              <div key={title} className="overview-card">
-                <div className="card-icon"><Icon size={28} /></div>
-                <div className="card-content">
-                  <p className="card-value">{value}</p>
-                  <p className="card-title">{title}</p>
-                </div>
-              </div>
-            ))}
-          </div>
+      {/* --- REVENUE CHART --- */}
+      <div className="overview-line-chart">
+        <ResponsiveContainer width="100%" height={300}>
+          <LineChart data={salesData}>
+            <CartesianGrid strokeDasharray="3 3" />
+            <XAxis dataKey="date" />
+            <YAxis />
+            <Tooltip />
+            <Legend />
+            <Line type="monotone" dataKey="revenue" stroke="#1DA15E" strokeWidth={2} />
+          </LineChart>
+        </ResponsiveContainer>
+      </div>
 
-          <div className="overview-line-chart">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={salesData} margin={revenueChartMargin}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="date" />
-                <YAxis tickFormatter={formatChartValue} />
-                <Tooltip
-                  wrapperStyle={{ zIndex: 10 }}
-                  contentStyle={{ borderRadius: 8, borderColor: "#e5e7eb", backgroundColor: "#ffffff" }}
-                  formatter={(value, name) => [formatChartValue(value), name]}
-                />
-                <Legend />
-                <Line type="monotone" dataKey="revenue" stroke="#1DA15E" strokeWidth={2} />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
+      {/* --- TOP LISTS --- */}
+      <div className="overview-bottom">
+        <div className="overview-list-card">
+          <h3 className="overview-list-title">Top 5 Salesmen</h3>
+          <ol className="overview-list">
+            {topSalesmen.map((name, i) => (
+              <li key={i} className="overview-list-item">
+                <span className="rank-number">{i + 1}</span>
+                <span className="rank-name">{name}</span>
+              </li>
+            ))}
+          </ol>
         </div>
 
-        <div className="overview-right-column" style={{ width: "250px", display: "flex", flexDirection: "column", gap: "20px" }}>
-          <div className="top-sellers">
-            <h3>Top 5 Salesmen</h3>
-            <ol>
-              {topSalesmen.map((name, idx) => (
-                <li key={idx}>{name}</li>
-              ))}
-            </ol>
-          </div>
-
-          <div className="top-countries">
-            <h3>Top 5 Countries</h3>
-            <ol>
-              {topCountries.map((country, idx) => (
-                <li key={idx}>{country}</li>
-              ))}
-            </ol>
-          </div>
+        <div className="overview-list-card">
+          <h3 className="overview-list-title">Top 5 Countries</h3>
+          <ol className="overview-list">
+            {topCountries.map((c, i) => (
+              <li key={i} className="overview-list-item">
+                <span className="rank-number">{i + 1}</span>
+                <span className="rank-name">{c}</span>
+              </li>
+            ))}
+          </ol>
         </div>
       </div>
     </div>

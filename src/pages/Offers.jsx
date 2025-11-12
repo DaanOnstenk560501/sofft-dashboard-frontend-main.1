@@ -13,6 +13,13 @@ import {
   ResponsiveContainer,
 } from "recharts";
 import { RANGE_OPTIONS, resolveDateRange, formatDate } from "../utils/dateRanges";
+import {
+  getOffersBySalesman,
+  getOffersByCountry,
+  getOfferStatusDistribution,
+  getAverageOfferValue,
+  getTotalDiscounts,
+} from "../apis/offers";
 
 export default function Offers() {
   const [offersBySalesman, setOffersBySalesman] = useState([]);
@@ -31,15 +38,11 @@ export default function Offers() {
   const COLORS = ["#1DA15E", "#4ADE80", "#FACC15", "#F87171"];
   const EURO_SYMBOL = "\u20AC";
 
-  // Fetch salesman list once for the dropdown
+  // Fetch salesman list once for dropdown
   useEffect(() => {
     async function fetchSalesmenList() {
       try {
-        const response = await fetch("http://localhost:8080/api/offers/per-salesman");
-        if (!response.ok) {
-          throw new Error(`Salesman request failed with status ${response.status}`);
-        }
-        const data = await response.json();
+        const data = await getOffersBySalesman();
         const mapped = data.map((s) => ({
           id: s.salesmanId,
           name: s.salesmanName || "Unknown",
@@ -51,11 +54,10 @@ export default function Offers() {
         console.error("Error fetching salesmen:", err);
       }
     }
-
     fetchSalesmenList();
   }, []);
 
-  // Fetch KPIs and charts when filters change
+  // Fetch data when filters change
   useEffect(() => {
     fetchFilteredData();
   }, [selectedSalesman, selectedRange]);
@@ -66,36 +68,24 @@ export default function Offers() {
       setError(null);
 
       const { start, end } = resolveDateRange(selectedRange, "6m");
-      const startDateParam = formatDate(start);
-      const endDateParam = formatDate(end);
-      setCurrentRange({ start: startDateParam, end: endDateParam });
+      const startDate = formatDate(start);
+      const endDate = formatDate(end);
+      setCurrentRange({ start: startDate, end: endDate });
 
-      const queryParams = new URLSearchParams({
-        startDate: startDateParam,
-        endDate: endDateParam,
-      });
-      if (selectedSalesman) {
-        queryParams.append("dealerId", selectedSalesman.id);
-      }
-      const queryString = `?${queryParams.toString()}`;
+      const filters = { startDate, endDate };
+      if (selectedSalesman) filters.dealerId = selectedSalesman.id;
 
-      const urls = [
-        `http://localhost:8080/api/offers/per-country${queryString}`,
-        `http://localhost:8080/api/offers/status-distribution${queryString}`,
-        `http://localhost:8080/api/offers/average-value${queryString}`,
-        `http://localhost:8080/api/offers/discounts-given${queryString}`,
-      ];
-
-      const responses = await Promise.all(urls.map((url) => fetch(url)));
-      responses.forEach((res, idx) => {
-        if (!res.ok) {
-          throw new Error(`Request ${urls[idx]} failed with status ${res.status}`);
-        }
-      });
-
-      const [countryData, statusData, avgData, discountData] = await Promise.all(
-        responses.map((res) => res.json())
-      );
+      const [
+        countryData,
+        statusData,
+        avgData,
+        discountData,
+      ] = await Promise.all([
+        getOffersByCountry(filters),
+        getOfferStatusDistribution(filters),
+        getAverageOfferValue(filters),
+        getTotalDiscounts(filters),
+      ]);
 
       setOffersByCountry(
         (countryData || []).map((c) => ({
@@ -113,17 +103,11 @@ export default function Offers() {
       );
 
       setAvgOfferValue(
-        avgData.averageValue ||
-          avgData.averageAmount ||
-          avgData.amount ||
-          0
+        avgData.averageValue || avgData.amount || 0
       );
 
       setTotalDiscounts(
-        discountData.totalDiscount ||
-          discountData.total ||
-          discountData.amount ||
-          0
+        discountData.totalDiscount || discountData.amount || 0
       );
 
       const totalOffersForRange =
@@ -143,7 +127,7 @@ export default function Offers() {
 
       setLoading(false);
     } catch (err) {
-      console.error("Error fetching filtered data:", err);
+      console.error("Error fetching offers:", err);
       setError(err.message || "Failed to load offers data.");
       setLoading(false);
     }
@@ -154,12 +138,12 @@ export default function Offers() {
 
   const stats = [
     {
-      title: "Average Offer Value (\u20AC excl. VAT)",
+      title: "Average Offer Value (€ excl. VAT)",
       value: `${EURO_SYMBOL}${avgOfferValue.toLocaleString()}`,
       icon: Icons.DollarSign,
     },
     {
-      title: "Discounts Given (\u20AC)",
+      title: "Discounts Given (€)",
       value: `${EURO_SYMBOL}${totalDiscounts.toLocaleString()}`,
       icon: Icons.Percent,
     },
@@ -174,7 +158,7 @@ export default function Offers() {
     <div className="offers-container">
       <h2 className="offers-title">Offers Dashboard</h2>
 
-      {/* Salesman & Time Filters */}
+      {/* Filters */}
       <section className="overview-filter-card offers-filter-card">
         <div className="overview-filter-header">
           <div className="overview-filter-icon">
@@ -187,7 +171,7 @@ export default function Offers() {
         </div>
 
         <div className="overview-filters">
-          <label className="overview-filter-label" htmlFor="salesmanSelect">
+          <label htmlFor="salesmanSelect" className="overview-filter-label">
             Salesman
           </label>
           <select
@@ -196,14 +180,11 @@ export default function Offers() {
             value={selectedSalesman?.id || ""}
             onChange={(e) => {
               const value = e.target.value;
-              if (!value) {
-                setSelectedSalesman(null);
-                return;
-              }
-              const selected = offersBySalesman.find(
-                (s) => s.id === parseInt(value, 10)
+              setSelectedSalesman(
+                value
+                  ? offersBySalesman.find((s) => s.id === parseInt(value, 10)) || null
+                  : null
               );
-              setSelectedSalesman(selected || null);
             }}
           >
             <option value="">All Salesmen</option>
@@ -223,8 +204,9 @@ export default function Offers() {
                 key={option.key}
                 type="button"
                 onClick={() => setSelectedRange(option.key)}
-                className={`time-range-chip${selectedRange === option.key ? " active" : ""}`}
-                aria-pressed={selectedRange === option.key}
+                className={`time-range-chip${
+                  selectedRange === option.key ? " active" : ""
+                }`}
               >
                 {option.label}
               </button>
@@ -233,7 +215,8 @@ export default function Offers() {
         </div>
 
         <p className="current-range-caption">
-          Viewing data from <strong>{currentRange.start || "N/A"}</strong> to <strong>{currentRange.end || "N/A"}</strong>.
+          Viewing data from <strong>{currentRange.start || "N/A"}</strong> to{" "}
+          <strong>{currentRange.end || "N/A"}</strong>.
         </p>
       </section>
 
@@ -252,7 +235,7 @@ export default function Offers() {
         ))}
       </div>
 
-      {/* Offers per Country or Salesman */}
+      {/* Charts */}
       {!selectedSalesman ? (
         <div className="offers-chart-card">
           <h3>Offers per Country</h3>

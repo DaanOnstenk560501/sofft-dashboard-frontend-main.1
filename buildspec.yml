@@ -8,10 +8,10 @@ env:
     NODE_VERSION: "20"
     AWS_ACCOUNT_ID: "426333731043"
     AWS_DEFAULT_REGION: "eu-central-1"
-    IMAGE_REPO_NAME: "sofft-dashboard-frontend"
+    IMAGE_REPO_NAME: "ecr-repo"
     CONTAINER_NAME: "frontend-container"
-    ECS_CLUSTER: "frontend-service"
-    ECS_SERVICE: "sofft-frontend-service"
+    ECS_CLUSTER: "app-cluster"
+    ECS_SERVICE: "frontend-service"
     TASK_DEFINITION_NAME: "frontend-task"
 
 phases:

@@ -8,18 +8,17 @@ import {
   ResponsiveContainer,
   LabelList,
 } from "recharts";
+import {
+  getTotalUpsellValue,
+  getAverageUpsellValue,
+  getDiscountedUpsells,
+  getTopUpsellCategories,
+  getTopUpsellItems,
+} from "../apis/productinsights";
 
-const API_BASE = "http://localhost:8080/api/cross-sell-products";
 const EURO_SYMBOL = "\u20AC";
 
-const fetchJson = async (url) => {
-  const response = await fetch(url);
-  if (!response.ok) {
-    throw new Error(`Request failed with status ${response.status} for ${url}`);
-  }
-  return response.json();
-};
-
+// --- Utility Formatters ---
 const formatNumber = (value) => {
   const numeric = Number(value);
   if (Number.isNaN(numeric)) return value ?? "-";
@@ -34,11 +33,10 @@ const formatPercentage = (value) => {
   return numeric.toFixed(2);
 };
 
+// --- Label Wrapping Helpers ---
 const wrapLabelIntoLines = (value, maxCharsPerLine) => {
   const text = String(value ?? "").trim();
-  if (!text) {
-    return [""];
-  }
+  if (!text) return [""];
 
   const words = text.split(/\s+/);
   const lines = [];
@@ -48,33 +46,28 @@ const wrapLabelIntoLines = (value, maxCharsPerLine) => {
     const tentative = currentLine ? `${currentLine} ${word}` : word;
     if (tentative.length <= maxCharsPerLine) {
       currentLine = tentative;
-      return;
-    }
-
-    if (currentLine) {
-      lines.push(currentLine);
-    }
-
-    if (word.length <= maxCharsPerLine) {
-      currentLine = word;
     } else {
-      const chunkRegex = new RegExp(`.{1,${maxCharsPerLine}}`, "g");
-      const chunks = word.match(chunkRegex) ?? [word];
-      if (chunks.length > 1) {
-        lines.push(...chunks.slice(0, -1));
+      if (currentLine) lines.push(currentLine);
+      if (word.length <= maxCharsPerLine) {
+        currentLine = word;
+      } else {
+        const chunkRegex = new RegExp(`.{1,${maxCharsPerLine}}`, "g");
+        const chunks = word.match(chunkRegex) ?? [word];
+        if (chunks.length > 1) lines.push(...chunks.slice(0, -1));
+        currentLine = chunks[chunks.length - 1] ?? "";
       }
-      currentLine = chunks[chunks.length - 1] ?? "";
     }
   });
 
-  if (currentLine) {
-    lines.push(currentLine);
-  }
-
+  if (currentLine) lines.push(currentLine);
   return lines.length ? lines : [text];
 };
 
-const createWrappedTickRenderer = (maxCharsPerLine = 12, maxLines = 3) => ({ x, y, payload }) => {
+const createWrappedTickRenderer = (maxCharsPerLine = 12, maxLines = 3) => ({
+  x,
+  y,
+  payload,
+}) => {
   const rawValue = payload?.value ?? "";
   const lines = wrapLabelIntoLines(rawValue, maxCharsPerLine);
   const limitedLines = lines.slice(0, maxLines);
@@ -98,7 +91,6 @@ const createWrappedTickRenderer = (maxCharsPerLine = 12, maxLines = 3) => ({ x, 
 
 export default function ProductInsights() {
   const [totalUpsellValue, setTotalUpsellValue] = useState(0);
-  // const [upsellAttachmentRate, setUpsellAttachmentRate] = useState(0);
   const [averageUpsellValue, setAverageUpsellValue] = useState(0);
   const [discountedUpsells, setDiscountedUpsells] = useState({});
 
@@ -113,64 +105,52 @@ export default function ProductInsights() {
   const categoryTick = useMemo(() => createWrappedTickRenderer(), []);
   const itemTick = useMemo(() => createWrappedTickRenderer(), []);
 
+  // --- Load KPI Data ---
   useEffect(() => {
-    const fetchData = async () => {
+    const fetchKPIData = async () => {
       try {
-        const [totalValueData, avgValueData, discountedData] = await Promise.all([
-          fetchJson(`${API_BASE}/total-upsell-value`),
-          fetchJson(`${API_BASE}/average-upsell-value`),
-          fetchJson(`${API_BASE}/discounted-upsells`),
+        const [total, avg, discounts] = await Promise.all([
+          getTotalUpsellValue(),
+          getAverageUpsellValue(),
+          getDiscountedUpsells(),
         ]);
-
-        setTotalUpsellValue(totalValueData ?? 0);
-        // setUpsellAttachmentRate(attachmentRateData ?? 0);
-        setAverageUpsellValue(avgValueData ?? 0);
-        setDiscountedUpsells(discountedData ?? {});
-      } catch (error) {
-        console.error("Error loading KPI data:", error);
+        setTotalUpsellValue(total ?? 0);
+        setAverageUpsellValue(avg ?? 0);
+        setDiscountedUpsells(discounts ?? {});
+      } catch (err) {
+        console.error("Error loading KPI data:", err);
       } finally {
         setLoading(false);
       }
     };
-
-    fetchData();
+    fetchKPIData();
   }, []);
 
+  // --- Load Categories ---
   useEffect(() => {
     const fetchCategories = async () => {
       try {
-        const endpoint =
-          categoryMode === "count"
-            ? `${API_BASE}/top-upsell-categories-count`
-            : `${API_BASE}/top-upsell-categories-value`;
-
-        const data = await fetchJson(endpoint);
+        const data = await getTopUpsellCategories(categoryMode);
         setTopUpsellCategories(Array.isArray(data) ? data : []);
-      } catch (error) {
-        console.error("Error loading category data:", error);
+      } catch (err) {
+        console.error("Error loading category data:", err);
         setTopUpsellCategories([]);
       }
     };
-
     fetchCategories();
   }, [categoryMode]);
 
+  // --- Load Items ---
   useEffect(() => {
     const fetchItems = async () => {
       try {
-        const endpoint =
-          itemMode === "count"
-            ? `${API_BASE}/top-upsell-items-count`
-            : `${API_BASE}/top-upsell-items-value`;
-
-        const data = await fetchJson(endpoint);
+        const data = await getTopUpsellItems(itemMode);
         setTopUpsellItems(Array.isArray(data) ? data : []);
-      } catch (error) {
-        console.error("Error loading item data:", error);
+      } catch (err) {
+        console.error("Error loading item data:", err);
         setTopUpsellItems([]);
       }
     };
-
     fetchItems();
   }, [itemMode]);
 
@@ -187,25 +167,27 @@ export default function ProductInsights() {
     <div className="product-insights-container">
       <h1 className="product-insights-title">Product Insights</h1>
 
+      {/* KPI Cards */}
       <div className="kpi-grid">
         <div className="kpi-card">
           <h3>Total Upsell Value ({EURO_SYMBOL})</h3>
           <p className="kpi-value">{formatEuro(totalUpsellValue)}</p>
         </div>
-
         <div className="kpi-card">
           <h3>Average Upsell Value</h3>
           <p className="kpi-value">{formatEuro(averageUpsellValue)}</p>
         </div>
       </div>
 
+      {/* Charts */}
       <div className="charts-grid">
+        {/* Categories */}
         <div className="chart-card">
           <div className="chart-header">
             <h3>Top Upsell Categories</h3>
             <select
               value={categoryMode}
-              onChange={(event) => setCategoryMode(event.target.value)}
+              onChange={(e) => setCategoryMode(e.target.value)}
               className="category-filter"
             >
               <option value="count">By Count</option>
@@ -220,7 +202,9 @@ export default function ProductInsights() {
                   data={topUpsellCategories.map((item) => ({
                     name: item.category,
                     value:
-                      categoryMode === "count" ? item.count : item.totalValue,
+                      categoryMode === "count"
+                        ? item.count
+                        : item.totalValue,
                   }))}
                   margin={{ top: 40, right: 20, left: 0, bottom: 80 }}
                 >
@@ -243,12 +227,12 @@ export default function ProductInsights() {
                   <Bar
                     dataKey="value"
                     fill="#1DA15E"
+                    barSize={20}
                     name={
                       categoryMode === "count"
                         ? "Upsell Count"
                         : `Upsell Value (${EURO_SYMBOL})`
                     }
-                    barSize={20}
                   >
                     <LabelList
                       dataKey="value"
@@ -271,12 +255,13 @@ export default function ProductInsights() {
           )}
         </div>
 
+        {/* Items */}
         <div className="chart-card">
           <div className="chart-header">
             <h3>Top Upsell Items</h3>
             <select
               value={itemMode}
-              onChange={(event) => setItemMode(event.target.value)}
+              onChange={(e) => setItemMode(e.target.value)}
               className="category-filter"
             >
               <option value="count">By Count</option>
@@ -290,7 +275,10 @@ export default function ProductInsights() {
                 <BarChart
                   data={topUpsellItems.map((item) => ({
                     name: item.item,
-                    value: itemMode === "count" ? item.count : item.totalValue,
+                    value:
+                      itemMode === "count"
+                        ? item.count
+                        : item.totalValue,
                   }))}
                   margin={{ top: 40, right: 20, left: 0, bottom: 80 }}
                 >
@@ -313,12 +301,12 @@ export default function ProductInsights() {
                   <Bar
                     dataKey="value"
                     fill="#1DA15E"
+                    barSize={20}
                     name={
                       itemMode === "count"
                         ? "Upsell Count"
                         : `Upsell Value (${EURO_SYMBOL})`
                     }
-                    barSize={20}
                   >
                     <LabelList
                       dataKey="value"
@@ -342,6 +330,7 @@ export default function ProductInsights() {
         </div>
       </div>
 
+      {/* Discounted Upsells */}
       <div className="discounted-upsells-card">
         <h3>Discounted Upsells</h3>
         {discountedUpsells && Object.keys(discountedUpsells).length > 0 ? (
@@ -352,7 +341,10 @@ export default function ProductInsights() {
             </p>
             <p>
               <strong>Average Discount:</strong>{" "}
-              {formatPercentage(discountedUpsells.averageDiscountPercent)}%
+              {formatPercentage(
+                discountedUpsells.averageDiscountPercent
+              )}
+              %
             </p>
           </div>
         ) : (

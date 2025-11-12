@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { ComposableMap, Geographies, Geography, ZoomableGroup } from "react-simple-maps";
+import { getGeoKpiData } from "../apis/geo";
 
-const GEO_ENDPOINT = "http://localhost:8080/api/dashboard/geo";
 const WORLD_GEOJSON_URL = "https://cdn.jsdelivr.net/npm/world-atlas@2/countries-110m.json";
 const ZERO_SALES_FILL = "#d2dfd7";
 const COLOR_STOPS = ["#d7f2df", "#aee4c5", "#7acc9d", "#49a374", "#2f7b51", "#18553a"];
@@ -27,9 +27,9 @@ const fallbackGeoKpi = {
   ],
 };
 
+// --- Helper functions (same as before) ---
 function normalizeCountryRecord(record) {
   if (!record || typeof record !== "object") return null;
-
   const rawCode =
     record.countryCode ??
     record.countryISO ??
@@ -146,6 +146,7 @@ function interpolateColor(ratio) {
   return rgbToHex(mixed);
 }
 
+// --- Main Component ---
 export default function Geo() {
   const [countrySales, setCountrySales] = useState([]);
   const [meta, setMeta] = useState({ updatedAt: null, currency: fallbackGeoKpi.currency });
@@ -159,11 +160,11 @@ export default function Geo() {
 
     async function loadGeoKpi() {
       try {
-        const response = await fetch(GEO_ENDPOINT);
-        if (!response.ok) throw new Error(`Request failed with status ${response.status}`);
-        const payload = await response.json();
+        const payload = await getGeoKpiData();
         if (ignore) return;
+
         const { entries, meta: metaFromPayload } = extractGeoPayload(payload);
+
         if (entries.length === 0) {
           setCountrySales(fallbackGeoKpi.entries);
           setMeta({ updatedAt: fallbackGeoKpi.updatedAt, currency: fallbackGeoKpi.currency });
@@ -189,10 +190,7 @@ export default function Geo() {
     }
 
     loadGeoKpi();
-
-    return () => {
-      ignore = true;
-    };
+    return () => { ignore = true; };
   }, []);
 
   const salesByCountry = useMemo(() => {
@@ -200,9 +198,7 @@ export default function Geo() {
     countrySales.forEach(({ countryCode, countryName, sales }) => {
       map.set(countryCode.toUpperCase(), sales);
       const normalized = normalizeName(countryName);
-      if (normalized) {
-        map.set(normalized, sales);
-      }
+      if (normalized) map.set(normalized, sales);
     });
     return map;
   }, [countrySales]);
@@ -212,55 +208,41 @@ export default function Geo() {
     countrySales.forEach(({ countryCode, countryName, orders }) => {
       map.set(countryCode.toUpperCase(), orders ?? 0);
       const normalized = normalizeName(countryName);
-      if (normalized) {
-        map.set(normalized, orders ?? 0);
-      }
+      if (normalized) map.set(normalized, orders ?? 0);
     });
     return map;
   }, [countrySales]);
 
-  const maxSales = useMemo(() => {
-    if (countrySales.length === 0) return 0;
-    return countrySales.reduce((max, row) => (row.sales > max ? row.sales : max), 0);
-  }, [countrySales]);
+  const maxSales = useMemo(
+    () => countrySales.reduce((max, row) => Math.max(max, row.sales), 0),
+    [countrySales]
+  );
 
-  const totalSales = useMemo(() => {
-    return countrySales.reduce((sum, row) => sum + row.sales, 0);
-  }, [countrySales]);
+  const totalSales = useMemo(
+    () => countrySales.reduce((sum, row) => sum + row.sales, 0),
+    [countrySales]
+  );
 
-  const topCountries = useMemo(() => {
-    return [...countrySales].sort((a, b) => b.sales - a.sales).slice(0, 5);
-  }, [countrySales]);
+  const topCountries = useMemo(
+    () => [...countrySales].sort((a, b) => b.sales - a.sales).slice(0, 5),
+    [countrySales]
+  );
 
-  const numberFormatter = useMemo(() => {
-    return new Intl.NumberFormat("en-US", {
-      notation: "compact",
-      maximumFractionDigits: 1,
-    });
-  }, []);
+  const numberFormatter = useMemo(
+    () => new Intl.NumberFormat("en-US", { notation: "compact", maximumFractionDigits: 1 }),
+    []
+  );
 
   const formatFullNumber = useMemo(() => {
     const currency = meta.currency && meta.currency.length === 3 ? meta.currency : undefined;
-
-    if (currency) {
-      const formatter = new Intl.NumberFormat("en-US", {
-        style: "currency",
-        currency,
-        maximumFractionDigits: 0,
-      });
-      return (value) => formatter.format(value);
-    }
-
-    const formatter = new Intl.NumberFormat("en-US", {
+    return new Intl.NumberFormat("en-US", {
+      style: currency ? "currency" : "decimal",
+      currency,
       maximumFractionDigits: 0,
-    });
-    return (value) => formatter.format(value);
+    }).format;
   }, [meta.currency]);
 
-  const colorForValue = (value) => {
-    if (!value || maxSales === 0) return ZERO_SALES_FILL;
-    return interpolateColor(value / maxSales);
-  };
+  const colorForValue = (value) => (!value || maxSales === 0 ? ZERO_SALES_FILL : interpolateColor(value / maxSales));
 
   if (loading && countrySales.length === 0) {
     return (
@@ -332,23 +314,14 @@ export default function Geo() {
                           key={geo.rsmKey}
                           geography={geo}
                           fill={fill}
-                          onMouseEnter={() => {
-                            if (!value) {
-                              setHovered({
-                                code: countryCode || "",
-                                name: countryName,
-                                value: 0,
-                                orders: 0,
-                              });
-                              return;
-                            }
+                          onMouseEnter={() =>
                             setHovered({
                               code: countryCode || "",
                               name: countryName,
-                              value,
+                              value: value || 0,
                               orders,
-                            });
-                          }}
+                            })
+                          }
                           onMouseLeave={() => setHovered(null)}
                           stroke="#ffffff"
                           strokeWidth={0.5}
@@ -376,9 +349,7 @@ export default function Geo() {
               <span className="geo-hover-value">
                 {hovered.value ? formatFullNumber(hovered.value) : "No data"}
               </span>
-              <span className="geo-hover-subtext">
-                Orders: {hovered.orders ?? 0}
-              </span>
+              <span className="geo-hover-subtext">Orders: {hovered.orders ?? 0}</span>
               <span className="geo-hover-subtext">
                 Avg order:{" "}
                 {hovered.orders && hovered.orders > 0
