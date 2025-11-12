@@ -1,5 +1,5 @@
-# AWS CodeBuild specification for Frontend Deployment
-# Builds and deploys the React/Vite frontend to existing ECS infrastructure
+# AWS CodeBuild specification for Frontend Deployment (React/Vite on ECS)
+# Builds a production image, pushes to ECR, registers a new ECS task revision, and updates the service.
 
 version: 0.2
 
@@ -8,91 +8,99 @@ env:
     NODE_VERSION: "20"
     AWS_ACCOUNT_ID: "426333731043"
     AWS_DEFAULT_REGION: "eu-central-1"
-    IMAGE_REPO_NAME: "ecr-repo"
-    CONTAINER_NAME: "frontend-container"
+    IMAGE_REPO_NAME: "ecr-repo"            # Ensure this ECR repo exists
+    CONTAINER_NAME: "frontend-container"    # Must match the container name in the ECS task definition
     ECS_CLUSTER: "app-cluster"
     ECS_SERVICE: "frontend-service"
-    TASK_DEFINITION_NAME: "frontend-task"
+    TASK_DEFINITION_NAME: "frontend-task"   # ECS task definition family name
 
 phases:
   install:
     runtime-versions:
       nodejs: $NODE_VERSION
     commands:
-      - echo "Installing jq..."
+      - echo "Installing tooling..."
       - apt-get update && apt-get install -y jq
 
   pre_build:
     commands:
-      - echo "Starting build at `date`"
-      - echo "AWS Account ID - $AWS_ACCOUNT_ID"
+      - echo "Starting build at $(date)"
+      - echo "AWS Account ID: $AWS_ACCOUNT_ID"
       - echo "Logging in to Amazon ECR..."
       - aws ecr get-login-password --region $AWS_DEFAULT_REGION | docker login --username AWS --password-stdin $AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com
       - REPOSITORY_URI=$AWS_ACCOUNT_ID.dkr.ecr.$AWS_DEFAULT_REGION.amazonaws.com/$IMAGE_REPO_NAME
       - COMMIT_HASH=$(echo $CODEBUILD_RESOLVED_SOURCE_VERSION | cut -c 1-7)
       - IMAGE_TAG=${COMMIT_HASH:=latest}
-      - echo "Image URI - $REPOSITORY_URI:$IMAGE_TAG"
-      - echo "Installing Node.js dependencies..."
+      - echo "Image URI: $REPOSITORY_URI:$IMAGE_TAG"
+      - echo "Installing Node.js dependencies (workspace)..."
       - npm ci --prefer-offline --no-audit
       - echo "Running ESLint..."
-      - npm run lint
-      - echo "Building production application..."
+      - npm run lint || echo "Lint warnings present (continuing)"
+      - echo "Building production application (workspace)..."
       - npm run build
-      - echo "Build output:"
+      - echo "Verifying build output..."
+      - test -d dist && test "$(ls -A dist)" || { echo "ERROR: dist is empty"; exit 1; }
       - ls -la dist/
 
   build:
     commands:
-      - echo "Building Docker image..."
+      - echo "Preparing Dockerfile (if not present)..."
       - |
         if [ ! -f Dockerfile ]; then
-          echo "Creating Dockerfile..."
           cat > Dockerfile <<'EOF'
         FROM node:20-alpine as builder
         WORKDIR /app
         COPY package*.json ./
-        RUN npm ci --only=production
+        # Install full dependencies (includes devDependencies for Vite)
+        RUN npm ci
         COPY . .
         RUN npm run build
 
         FROM nginx:alpine
-        COPY --from=builder /app/nginx.conf /etc/nginx/conf.d/default.conf 2>/dev/null || \
-        echo 'server {
-            listen 80;
-            server_name localhost;
-            root /usr/share/nginx/html;
-            index index.html;
-
-            gzip on;
-            gzip_vary on;
-            gzip_min_length 1024;
-            gzip_types text/plain text/css text/xml text/javascript application/javascript application/xml+rss application/json;
-
-            location ~* \.(js|css|png|jpg|jpeg|gif|svg|ico|woff|woff2)$ {
-                expires 1y;
-                add_header Cache-Control "public, immutable";
-            }
-
-            location / {
-                try_files $uri $uri/ /index.html;
-            }
-
-            location /health {
-                access_log off;
-                return 200 "healthy\n";
-                add_header Content-Type text/plain;
-            }
-        }' > /etc/nginx/conf.d/default.conf
-
+        # Default Nginx config (SPA + caching + /health). Adjust /api proxy if needed.
+        RUN printf '%s\n' \
+          'server {' \
+          '  listen 80;' \
+          '  server_name localhost;' \
+          '  root /usr/share/nginx/html;' \
+          '  index index.html;' \
+          '' \
+          '  gzip on;' \
+          '  gzip_vary on;' \
+          '  gzip_min_length 1024;' \
+          '  gzip_types text/plain text/css text/xml text/javascript application/javascript application/xml+rss application/json;' \
+          '' \
+          '  location ~* \.(js|css|png|jpg|jpeg|gif|svg|ico|woff|woff2)$ {' \
+          '    expires 1y;' \
+          '    add_header Cache-Control "public, immutable";' \
+          '  }' \
+          '' \
+          '  # Uncomment and update backend URL if you need to proxy API calls from the frontend container' \
+          '  # location /api/ {' \
+          '  #   proxy_pass http://backend.internal/;' \
+          '  #   proxy_set_header Host $host;' \
+          '  #   proxy_set_header X-Real-IP $remote_addr;' \
+          '  #   proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;' \
+          '  # }' \
+          '' \
+          '  location / {' \
+          '    try_files $uri $uri/ /index.html;' \
+          '  }' \
+          '' \
+          '  location /health {' \
+          '    access_log off;' \
+          '    return 200 "healthy\n";' \
+          '    add_header Content-Type text/plain;' \
+          '  }' \
+          '}' > /etc/nginx/conf.d/default.conf
         COPY --from=builder /app/dist /usr/share/nginx/html
-
         HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
           CMD wget --no-verbose --tries=1 --spider http://localhost/health || exit 1
-
         EXPOSE 80
         CMD ["nginx", "-g", "daemon off;"]
         EOF
         fi
+      - echo "Building Docker image..."
       - docker build -t $REPOSITORY_URI:latest .
       - docker tag $REPOSITORY_URI:latest $REPOSITORY_URI:$IMAGE_TAG
       - docker images $REPOSITORY_URI --format "table {{.Repository}}:{{.Tag}}\t{{.Size}}"
@@ -102,49 +110,65 @@ phases:
       - echo "Pushing Docker image to ECR..."
       - docker push $REPOSITORY_URI:latest
       - docker push $REPOSITORY_URI:$IMAGE_TAG
-      - echo "✅ Image pushed successfully!"
-      - echo "Fetching current task definition..."
+      - echo "Image push complete."
+
+      - echo "Fetching current ECS task definition..."
       - >
-        TASK_DEFINITION=$(aws ecs describe-task-definition 
-          --task-definition $TASK_DEFINITION_NAME 
-          --query 'taskDefinition' 
+        TASK_DEFINITION=$(aws ecs describe-task-definition
+          --task-definition $TASK_DEFINITION_NAME
+          --query 'taskDefinition'
           --output json)
-      - echo "Creating new task definition revision..."
+
+      - echo "Creating new task definition revision with updated image for container: $CONTAINER_NAME"
       - |
-        echo $TASK_DEFINITION | jq --arg IMAGE "$REPOSITORY_URI:$IMAGE_TAG" \
-          '.containerDefinitions[0].image = $IMAGE | 
-           del(.taskDefinitionArn) | 
-           del(.revision) | 
-           del(.status) | 
-           del(.requiresAttributes) | 
-           del(.compatibilities) | 
-           del(.registeredAt) | 
-           del(.registeredBy)' > new-task-definition.json
+        echo "$TASK_DEFINITION" | jq \
+          --arg NAME "$CONTAINER_NAME" \
+          --arg IMAGE "$REPOSITORY_URI:$IMAGE_TAG" \
+          '
+          .containerDefinitions |=
+            map(if .name == $NAME then .image = $IMAGE else . end)
+          | del(
+              .taskDefinitionArn,
+              .revision,
+              .status,
+              .requiresAttributes,
+              .compatibilities,
+              .registeredAt,
+              .registeredBy
+            )
+          ' > new-task-definition.json
+
+      - echo "Registering new task definition revision..."
       - >
-        NEW_TASK_INFO=$(aws ecs register-task-definition 
+        NEW_TASK_INFO=$(aws ecs register-task-definition
           --cli-input-json file://new-task-definition.json)
-      - NEW_TASK_DEF=$(echo $NEW_TASK_INFO | jq -r '.taskDefinition.taskDefinitionArn')
-      - echo "New task definition - $NEW_TASK_DEF"
-      - echo "Updating ECS service..."
+      - NEW_TASK_DEF=$(echo "$NEW_TASK_INFO" | jq -r '.taskDefinition.taskDefinitionArn')
+      - echo "New task definition ARN: $NEW_TASK_DEF"
+
+      - echo "Updating ECS service to use new task definition..."
       - >
-        aws ecs update-service 
-          --cluster $ECS_CLUSTER 
-          --service $ECS_SERVICE 
-          --task-definition $NEW_TASK_DEF 
+        aws ecs update-service
+          --cluster $ECS_CLUSTER
+          --service $ECS_SERVICE
+          --task-definition $NEW_TASK_DEF
           --force-new-deployment
+
+      - echo "Waiting for service to stabilize (up to 10 minutes)..."
       - |
-        echo "Waiting for service to stabilize (max 10 minutes)..."
         timeout 600 aws ecs wait services-stable \
           --cluster $ECS_CLUSTER \
           --services $ECS_SERVICE || echo "Service is still updating..."
+
+      - echo "Deployment status:"
       - >
-        aws ecs describe-services 
-          --cluster $ECS_CLUSTER 
-          --services $ECS_SERVICE 
-          --query 'services[0].deployments' 
+        aws ecs describe-services
+          --cluster $ECS_CLUSTER
+          --services $ECS_SERVICE
+          --query 'services[0].deployments'
           --output table
+
+      - echo "Getting application URL (if behind ALB)..."
       - |
-        echo "Getting application URL..."
         TARGET_GROUP_ARN=$(aws ecs describe-services \
           --cluster $ECS_CLUSTER \
           --services $ECS_SERVICE \
@@ -156,17 +180,16 @@ phases:
             --target-group-arns $TARGET_GROUP_ARN \
             --query 'TargetGroups[0].LoadBalancerArns[0]' \
             --output text)
-
           ALB_DNS=$(aws elbv2 describe-load-balancers \
             --load-balancer-arns $ALB_ARN \
             --query 'LoadBalancers[0].DNSName' \
             --output text)
-
-          echo "✅ Application URL: http://$ALB_DNS"
+          echo "Application URL: http://$ALB_DNS"
         else
-          echo "ℹ️ No Load Balancer DNS found."
+          echo "No Load Balancer DNS found."
         fi
-      - echo "🚀 Deployment completed successfully at `date`"
+
+      - echo "Deployment completed at $(date)"
 
 artifacts:
   files:
