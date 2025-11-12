@@ -8,8 +8,8 @@ env:
     NODE_VERSION: "20"
     AWS_ACCOUNT_ID: "426333731043"
     AWS_DEFAULT_REGION: "eu-central-1"
-    IMAGE_REPO_NAME: "ecr-repo"            
-    CONTAINER_NAME: "frontend"    # Must match the container name in the ECS task definition
+    IMAGE_REPO_NAME: "ecr-repo"
+    CONTAINER_NAME: "frontend"
     ECS_CLUSTER: "app-cluster"
     ECS_SERVICE: "frontend-service"
     TASK_DEFINITION_NAME: "frontend-task"
@@ -32,11 +32,11 @@ phases:
       - COMMIT_HASH=$(echo $CODEBUILD_RESOLVED_SOURCE_VERSION | cut -c 1-7)
       - IMAGE_TAG=${COMMIT_HASH:=latest}
       - echo "Image URI: $REPOSITORY_URI:$IMAGE_TAG"
-      - echo "Installing Node.js dependencies (workspace)..."
+      - echo "Installing Node.js dependencies (host workspace)..."
       - npm ci --prefer-offline --no-audit
       - echo "Running ESLint..."
       - npm run lint || echo "Lint warnings present (continuing)"
-      - echo "Building production application (workspace)..."
+      - echo "Building production application (host workspace)..."
       - npm run build
       - echo "Verifying build output..."
       - test -d dist && test "$(ls -A dist)" || { echo "ERROR: dist is empty"; exit 1; }
