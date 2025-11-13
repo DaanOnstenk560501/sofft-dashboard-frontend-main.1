@@ -10,7 +10,7 @@ env:
   ECR_REPOSITORY: frontend-repo
   ECS_SERVICE: frontend-service
   ECS_CLUSTER: app-cluster
-  ECS_TASK_DEFINITION: frontend-task
+  ECS_TASK_DEFINITION: frontend-app
   CONTAINER_NAME: frontend
 
 jobs:
