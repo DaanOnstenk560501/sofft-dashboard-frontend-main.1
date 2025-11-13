@@ -7,7 +7,7 @@ on:
 env:
   AWS_REGION: eu-central-1
   AWS_ACCOUNT_ID: 426333731043
-  ECR_REPOSITORY: ecr-repo
+  ECR_REPOSITORY: frontend-repo
   ECS_SERVICE: frontend-service
   ECS_CLUSTER: app-cluster
   ECS_TASK_DEFINITION: frontend-task
