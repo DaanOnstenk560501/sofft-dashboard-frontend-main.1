@@ -12,7 +12,6 @@ env:
   ECS_CLUSTER: app-cluster
   ECS_TASK_DEFINITION: frontend-task
   CONTAINER_NAME: frontend
-  EXPECTED_VPC_ID: vpc-0de8e4d9758b5e52d
 
 jobs:
   deploy:
