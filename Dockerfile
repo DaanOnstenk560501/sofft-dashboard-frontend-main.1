@@ -27,7 +27,11 @@ RUN printf '%s\n' \
   '' \
   '  # API proxy configuration' \
   '  location /api/ {' \
+<<<<<<< HEAD
   '    proxy_pass http://172.22.240.1:8080;' \
+=======
+  '    proxy_pass 10.0.10.111:8080;' \
+>>>>>>> d25a4bdafe15e44711ac74946e248551481da332
   '    proxy_set_header Host $host;' \
   '    proxy_set_header X-Real-IP $remote_addr;' \
   '    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;' \
